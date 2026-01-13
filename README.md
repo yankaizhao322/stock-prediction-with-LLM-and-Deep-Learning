@@ -15,7 +15,7 @@ The system follows a multi-stage workflow:
 
 ## Methodology and Technical Details
 
-### 1. Data Preprocessing
+### 1. Data Preprocessing(Kaggle)
 
 The pipeline uses pandas and sklearn.preprocessing for data handling:
 
@@ -90,3 +90,10 @@ Produce a structured text explanation for each prediction date based on sentimen
 
 ⚠️ Disclaimer
 This project is for educational and research purposes only. The predictions and LLM-generated explanations should not be construed as financial investment advice.
+
+# Contact:
+Author: Yankai Zhao
+
+Email: yaz624@lghigh.edu
+
+Institution: Lehigh University, Department of Electrical and Computer Engineering

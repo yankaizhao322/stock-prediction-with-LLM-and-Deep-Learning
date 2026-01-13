@@ -1,6 +1,10 @@
 # Stock Prediction with LLM, LSTM-GAN, and CNN
 
+
 This project implements a hybrid stock forecasting and interpretation pipeline that combines deep learning models (LSTM + GAN) with a lightweight CNN discriminator and a Large Language Model (LLM) for natural-language explanations. It leverages historical market data and social media sentiment to predict near-term stock movements and produces an analyst-style summary that explains the quantitative outputs in a traceable, evidence-based way.
+
+   *⚠️Disclaimer: This project is for educational and research purposes only. The predictions and LLM-generated explanations should not be construed as financial investment advice.*
+
 
 ## Project Overview
 
@@ -81,15 +85,11 @@ Inverse-transform model outputs back to the original scale and compare against r
 ### Step 4: LLM Explanation Generation
 Produce a structured text explanation for each prediction date based on sentiment summary and market evidence (no investment advice).
 
-# Results
-<img width="985" height="525" alt="image" src="https://github.com/user-attachments/assets/fd80737b-2109-41b0-8f2a-9145a2f35711" />
+# LLM output Results
+2022-01-20
 
-<img width="973" height="472" alt="image" src="https://github.com/user-attachments/assets/de1b61bc-aec1-49a2-9e97-08e680bca5b3" />
+<img width="600" height="500" alt="image" src="https://github.com/user-attachments/assets/fd80737b-2109-41b0-8f2a-9145a2f35711" />
 
-<img width="987" height="548" alt="image" src="https://github.com/user-attachments/assets/709fcf00-ae63-474f-933d-f5735a781c50" />
-
-⚠️ Disclaimer
-This project is for educational and research purposes only. The predictions and LLM-generated explanations should not be construed as financial investment advice.
 
 # Contact:
 Author: Yankai Zhao

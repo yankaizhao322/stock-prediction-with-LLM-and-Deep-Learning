@@ -5,6 +5,7 @@ from collections import Counter
 from typing import List, Dict, Optional
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
+
 def clean_text(s: str) -> str:
     s = re.sub(r"http\S+|www\.\S+", "", s)
     s = re.sub(r"[@#]\w+", "", s)
@@ -21,7 +22,8 @@ def try_vader():
         return None
 
 def compute_sentiment(texts: List[str], vader=None) -> Dict[str, float]:
-    if not texts: return dict(mean=0.0, pos_ratio=0.0)
+    if not texts:
+        return dict(mean=0.0, pos_ratio=0.0)
     if vader is not None:
         scores = [vader.polarity_scores(t)["compound"] for t in texts]
         arr = np.array(scores, dtype=float)
@@ -30,13 +32,19 @@ def compute_sentiment(texts: List[str], vader=None) -> Dict[str, float]:
     neg = {"miss","recall","lawsuit","bear","drop","negative","down","sell","downgrade","risk"}
     sc=[]
     for t in texts:
-        tl=t.lower(); p=sum(w in tl for w in pos); n=sum(w in tl for w in neg); sc.append(p-n)
+        tl=t.lower()
+        p=sum(w in tl for w in pos)
+        n=sum(w in tl for w in neg)
+        sc.append(p-n)
     arr=np.array(sc,dtype=float)
-    return dict(mean=float(arr.mean() if len(arr) else 0.0),
-                pos_ratio=float((arr>0).mean() if len(arr) else 0.0))
+    return dict(
+        mean=float(arr.mean() if len(arr) else 0.0),
+        pos_ratio=float((arr>0).mean() if len(arr) else 0.0)
+    )
 
 def top_keywords(texts: List[str], k: int = 12) -> List[str]:
-    if not texts: return []
+    if not texts:
+        return []
     stop=set("""
     a an the and or of for to in on with at from as is are was were be been being this that these those
     it its he's she's they're we're you're i've we've you've you'll won't can't don't didn't isn't aren't
@@ -46,7 +54,8 @@ def top_keywords(texts: List[str], k: int = 12) -> List[str]:
     for t in texts:
         for w in re.findall(r"[A-Za-z][A-Za-z\-']{1,}", t):
             wl=w.lower()
-            if wl not in stop and len(wl)>=3: words.append(wl)
+            if wl not in stop and len(wl)>=3:
+                words.append(wl)
     return [w for w,_ in Counter(words).most_common(k)]
 
 def previous_trading_day(target_date: str, price_index: pd.Index) -> pd.Timestamp:
@@ -54,7 +63,7 @@ def previous_trading_day(target_date: str, price_index: pd.Index) -> pd.Timestam
     dates = pd.to_datetime(price_index)
     prior = dates[dates < T]
     if len(prior) == 0:
-        raise ValueError("没有更早的交易日（检查价格数据范围）。")
+        raise ValueError("No earlier trading day found (check price data range).")
     return prior.max()
 
 def load_prices(prices_csv: str, ticker: str) -> pd.DataFrame:
@@ -79,10 +88,16 @@ def load_tweets(tweets_csv: str, ticker: str) -> pd.DataFrame:
 def load_predictions(pred_csv: str) -> pd.DataFrame:
     preds = pd.read_csv(pred_csv)
     if "date" not in preds.columns:
-        raise ValueError("predictions.csv 必须包含列 'date'")
+        raise ValueError("predictions.csv must contain column 'date'")
     preds["date"] = pd.to_datetime(preds["date"]).dt.normalize().dt.strftime("%Y-%m-%d")
-    if "pred_prob_up" not in preds.columns and "pred_label" not in preds.columns and "pred_price" not in preds.columns:
-        raise ValueError("predictions.csv 需包含 'pred_prob_up' 或 'pred_label'（可选 'pred_price'）")
+    if (
+        "pred_prob_up" not in preds.columns
+        and "pred_label" not in preds.columns
+        and "pred_price" not in preds.columns
+    ):
+        raise ValueError(
+            "predictions.csv must contain 'pred_prob_up' or 'pred_label' (optional: 'pred_price')"
+        )
     return preds
 
 def collect_evidence(pred_date: str, tweets_df: pd.DataFrame, prices_df: pd.DataFrame) -> Dict:
@@ -90,21 +105,30 @@ def collect_evidence(pred_date: str, tweets_df: pd.DataFrame, prices_df: pd.Data
     tz_ny = pytz.timezone("America/New_York")
     ts = pd.to_datetime(tweets_df["Date"], errors="coerce", utc=True)
     local_ts = ts.dt.tz_convert(tz_ny)
-    mask = (local_ts.dt.tz_localize(None).dt.normalize()==prev_day) & (local_ts.dt.hour<16)
-    day_tweets = tweets_df.loc[mask,"Tweet"].dropna().astype(str).tolist()
+    mask = (
+        (local_ts.dt.tz_localize(None).dt.normalize() == prev_day)
+        & (local_ts.dt.hour < 16)
+    )
+    day_tweets = tweets_df.loc[mask, "Tweet"].dropna().astype(str).tolist()
 
     uniq, seen = [], set()
     for t in day_tweets:
         key=t.lower()
         if key and key not in seen:
-            uniq.append(t); seen.add(key)
-            if len(uniq)>=8: break
+            uniq.append(t)
+            seen.add(key)
+            if len(uniq) >= 8:
+                break
 
     vader = try_vader()
     sent = compute_sentiment(uniq, vader=vader)
     kw   = top_keywords(uniq, k=12)
 
-    ret_today = float(prices_df["Close"].pct_change().loc[prev_day]) if prev_day in prices_df.index else 0.0
+    ret_today = (
+        float(prices_df["Close"].pct_change().loc[prev_day])
+        if prev_day in prices_df.index else 0.0
+    )
+
     vol_rel=None
     if "Volume" in prices_df.columns:
         ma20 = prices_df["Volume"].rolling(20).mean()
@@ -123,34 +147,55 @@ def collect_evidence(pred_date: str, tweets_df: pd.DataFrame, prices_df: pd.Data
 
 def gen_explanation(tok, lm, ticker: str, pred_date: str, prob_up: float, thr: float, ev: Dict) -> str:
     bullets = [
-        f"- 证据日（前一交易日）：{ev['evidence_day']}",
-        f"- 收盘前情绪均值：{ev['sent_mean']:.3f}；正面比例：{ev['sent_pos_ratio']:.1%}",
-        f"- 当日价格变动：{ev['price_change_today']:+.2%}" + (f"；成交量/20日均：{ev['volume_rel_mean']:.2f}x" if ev['volume_rel_mean'] is not None else "")
+        f"- Evidence day (previous trading day): {ev['evidence_day']}",
+        f"- Pre-close sentiment mean: {ev['sent_mean']:.3f}; positive ratio: {ev['sent_pos_ratio']:.1%}",
+        f"- Same-day price change: {ev['price_change_today']:+.2%}"
+        + (
+            f"; volume / 20-day average: {ev['volume_rel_mean']:.2f}x"
+            if ev['volume_rel_mean'] is not None else ""
+        )
     ]
     if ev["keywords"]:
-        bullets.append(f"- 关键词（频次）：{', '.join(ev['keywords'][:10])}")
+        bullets.append(f"- Keywords (by frequency): {', '.join(ev['keywords'][:10])}")
     if ev["tweets_sample"]:
-        bullets.append("- 代表性推文（收盘前）：")
+        bullets.append("- Representative tweets (before market close):")
         for t in ev["tweets_sample"]:
             bullets.append(f"  • {t[:140]}")
 
-    system = "你是严谨的金融研究助理。基于证据，输出可核查、克制的解释；中文回答，避免投资建议。"
-    user = f"""标的：{ticker}
-预测目标日（明日）：{pred_date}
-模型判断：上涨概率 {prob_up:.1%}（阈值 {thr:.2f}）
+    system = (
+        "You are a rigorous financial research assistant. "
+        "Based on the evidence, produce verifiable and restrained explanations. "
+        "Answer in English and avoid investment advice."
+    )
 
-证据：
+    user = f"""Asset: {ticker}
+Prediction target date (next trading day): {pred_date}
+Model output: probability of price increase {prob_up:.1%} (threshold {thr:.2f})
+
+Evidence:
 {os.linesep.join(bullets)}
 
-请用要点式回答：
-1) 明日可能上涨/下跌的主要驱动点（结合关键词与推文意涵）；
-2) 不确定性与相反信号（若有）；
-3) 需关注的后续事件（日程/财报/监管/供应链等）；
-4) 给出“证据覆盖度”的一句评价（推文是否足够、是否偏科）。
+Please answer in bullet points:
+1) Key drivers for a potential price increase or decrease tomorrow (based on keywords and tweet semantics);
+2) Uncertainty and opposing signals (if any);
+3) Events to monitor (earnings, regulation, supply chain, macro, etc.);
+4) One-sentence assessment of evidence coverage (tweet volume, balance, potential bias).
 """
-    msgs=[{"role":"system","content":system},{"role":"user","content":user}]
-    ids = tok.apply_chat_template(msgs, add_generation_prompt=True, return_tensors="pt").to(lm.device)
-    out = lm.generate(ids, max_new_tokens=320, temperature=0.2, top_p=0.9)
+    msgs=[
+        {"role":"system","content":system},
+        {"role":"user","content":user}
+    ]
+    ids = tok.apply_chat_template(
+        msgs,
+        add_generation_prompt=True,
+        return_tensors="pt"
+    ).to(lm.device)
+    out = lm.generate(
+        ids,
+        max_new_tokens=320,
+        temperature=0.2,
+        top_p=0.9
+    )
     return tok.decode(out[0][ids.shape[-1]:], skip_special_tokens=True)
 
 def main():
@@ -171,7 +216,8 @@ def main():
 
     tok = AutoTokenizer.from_pretrained(args.model_name, trust_remote_code=True)
     lm  = AutoModelForCausalLM.from_pretrained(
-        args.model_name, trust_remote_code=True,
+        args.model_name,
+        trust_remote_code=True,
         torch_dtype=torch.float16 if args.device=="cuda" else None,
         low_cpu_mem_usage=True
     ).to(args.device)
@@ -179,16 +225,29 @@ def main():
     rows=[]
     for _, r in preds.iterrows():
         d = str(r["date"])
-        prob = float(r.get("pred_prob_up", 1.0 if int(r.get("pred_label",0))==1 else 0.0))
+        prob = float(
+            r.get(
+                "pred_prob_up",
+                1.0 if int(r.get("pred_label",0))==1 else 0.0
+            )
+        )
         ev = collect_evidence(d, tweets, prices)
         text = gen_explanation(tok, lm, args.ticker, d, prob, args.threshold, ev)
         print("="*100)
-        print(f"[{args.ticker}] 目标日 {d} | 概率↑ {prob:.1%} | 阈值 {args.threshold:.2f}")
+        print(f"[{args.ticker}] Target date {d} | P(up) {prob:.1%} | Threshold {args.threshold:.2f}")
         print(text)
-        rows.append({"date": d, "prob_up": prob, "explanation": text})
+        rows.append({
+            "date": d,
+            "prob_up": prob,
+            "explanation": text
+        })
 
     pd.DataFrame(rows).to_csv(args.out_csv, index=False)
-    print("已导出解释：", os.path.abspath(args.out_csv))
+    print("Explanations exported to:", os.path.abspath(args.out_csv))
 
 if __name__ == "__main__":
     main()
+
+with open("explain_with_llm.py", "w", encoding="utf-8") as f:
+    f.write(code)
+print("Saved to explain_with_llm.py")
